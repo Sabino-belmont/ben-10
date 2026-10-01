@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Memória do Omnitrix</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;700&display=swap">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#e9f3e4; --panel:#ffffff; --ink:#10210f; --muted:#4b6347;
+  --green:#2fa80f; --glow:#6cff2f; --card-front:#f6fff0; --line:#1c3a17;
+  --font-d:'Bungee',Impact,'Arial Black',sans-serif;
+  --font-b:'Chakra Petch','Trebuchet MS',Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c150b; --panel:#15230f; --ink:#e8ffe0; --muted:#9bbf92;
+    --green:#4cd41a; --glow:#6cff2f; --card-front:#1d3116; --line:#6cff2f;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c150b; --panel:#15230f; --ink:#e8ffe0; --muted:#9bbf92;
+  --green:#4cd41a; --glow:#6cff2f; --card-front:#1d3116; --line:#6cff2f;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-b);min-height:100vh;
+  background-image:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--glow) 25%,transparent),transparent 55%)}
+main{max-width:640px;margin:0 auto;padding:20px 16px 32px}
+h1{font-family:var(--font-d);font-weight:400;font-size:clamp(1.8rem,7vw,2.8rem);margin:0;letter-spacing:.02em;line-height:1.05}
+.sub{margin:6px 0 18px;color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:16px}
+.stat{display:flex;gap:14px;font-weight:700}
+.stat span{color:var(--muted);font-weight:500}
+select,button{font:inherit;font-weight:700;color:var(--ink);background:var(--card-front);
+  border:2px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
+button.primary{background:var(--green);color:#06130a;border-color:var(--green)}
+button:focus-visible,select:focus-visible,.card:focus-visible{outline:3px solid var(--glow);outline-offset:2px}
+.board{display:grid;gap:10px;grid-template-columns:repeat(var(--cols),1fr)}
+.card{aspect-ratio:3/4;perspective:700px;background:none;border:0;padding:0;cursor:pointer}
+.inner{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.card.open .inner,.card.done .inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;border-radius:12px;border:2px solid var(--line);backface-visibility:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.back{background:radial-gradient(circle,#0b1a09 0 38%,var(--green) 39% 100%)}
+.back svg{width:52%;height:auto}
+.front{transform:rotateY(180deg);background:var(--card-front);text-align:center;padding:4px}
+.front .e{font-size:clamp(1.8rem,9vw,3rem);line-height:1}
+.front .n{font-family:var(--font-d);font-size:clamp(.55rem,2.6vw,.8rem);line-height:1.1}
+.card.done .front{box-shadow:0 0 14px var(--glow);border-color:var(--glow)}
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:20px}
+.modal.show{display:flex}
+.box{background:var(--panel);border:3px solid var(--glow);border-radius:18px;padding:24px;text-align:center;max-width:340px;box-shadow:0 0 30px var(--glow)}
+.box h2{font-family:var(--font-d);font-weight:400;margin:0 0 8px}
+@media (prefers-reduced-motion:reduce){.inner{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Memória do Omnitrix</h1>
+  <p class="sub">Encontre os pares de alienígenas antes que o Omnitrix esgote.</p>
+  <div class="bar">
+    <div class="stat"><div><span>Jogadas</span> <b id="moves">0</b></div><div><span>Tempo</span> <b id="time">0:00</b></div><div><span>Recorde</span> <b id="best">–</b></div></div>
+    <div>
+      <select id="level" aria-label="Dificuldade">
+        <option value="6">Fácil (6 pares)</option>
+        <option value="8" selected>Médio (8 pares)</option>
+        <option value="10">Difícil (10 pares)</option>
+      </select>
+      <button class="primary" id="restart">Reiniciar</button>
+    </div>
+  </div>
+  <div class="board" id="board" role="group" aria-label="Tabuleiro"></div>
+</main>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="box">
+    <h2>É hora de ação!</h2>
+    <p id="msg"></p>
+    <button class="primary" id="again">Jogar de novo</button>
+  </div>
+</div>
+
+<script>
+const ALIENS=[
+ ["Heatblast","🔥"],["Diamondhead","💎"],["XLR8","⚡"],["Four Arms","💪"],["Ghostfreak","👻"],
+ ["Wildmutt","🐺"],["Stinkfly","🪰"],["Grey Matter","🧠"],["Ripjaws","🦈"],["Upgrade","🤖"]
+];
+const HOURGLASS='<svg viewBox="0 0 40 50" aria-hidden="true"><path d="M6 4h28L22 25l12 21H6l12-21z" fill="#6cff2f" stroke="#06130a" stroke-width="3" stroke-linejoin="round"/></svg>';
+const $=id=>document.getElementById(id);
+let first=null,lock=false,moves=0,matched=0,pairs=8,timer=null,secs=0,started=false;
+
+function bestKey(){return 'ben10-best-'+pairs}
+function getBest(){try{return localStorage.getItem(bestKey())}catch(e){return null}}
+function setBest(v){try{localStorage.setItem(bestKey(),String(v))}catch(e){}}
+function fmt(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function start(){
+  clearInterval(timer);started=false;secs=0;moves=0;matched=0;first=null;lock=false;
+  pairs=parseInt($('level').value,10);
+  $('moves').textContent=0;$('time').textContent='0:00';
+  const b=getBest();$('best').textContent=b?b+' jogadas':'–';
+  const deck=shuffle(ALIENS.slice(0,pairs).flatMap(a=>[a,a]));
+  const board=$('board');
+  board.style.setProperty('--cols',deck.length===20?5:4);
+  board.innerHTML='';
+  deck.forEach(([name,emoji])=>{
+    const c=document.createElement('button');
+    c.className='card';c.dataset.name=name;
+    c.setAttribute('aria-label','Carta virada para baixo');
+    c.innerHTML='<div class="inner"><div class="face back">'+HOURGLASS+'</div><div class="face front"><span class="e">'+emoji+'</span><span class="n">'+name+'</span></div></div>';
+    c.addEventListener('click',()=>flip(c));
+    board.appendChild(c);
+  });
+  $('modal').classList.remove('show');
+}
+
+function flip(c){
+  if(lock||c===first||c.classList.contains('done')||c.classList.contains('open'))return;
+  if(!started){started=true;timer=setInterval(()=>{secs++;$('time').textContent=fmt(secs)},1000)}
+  c.classList.add('open');
+  c.setAttribute('aria-label',c.dataset.name);
+  if(!first){first=c;return}
+  moves++;$('moves').textContent=moves;
+  if(first.dataset.name===c.dataset.name){
+    [first,c].forEach(x=>{x.classList.remove('open');x.classList.add('done')});
+    first=null;matched++;
+    if(matched===pairs)win();
+  }else{
+    lock=true;const a=first;first=null;
+    setTimeout(()=>{
+      [a,c].forEach(x=>{x.classList.remove('open');x.setAttribute('aria-label','Carta virada para baixo')});
+      lock=false;
+    },850);
+  }
+}
+
+function win(){
+  clearInterval(timer);
+  const b=parseInt(getBest()||'0',10);
+  let extra='';
+  if(!b||moves<b){setBest(moves);extra=' Novo recorde!';$('best').textContent=moves+' jogadas'}
+  $('msg').textContent='Você achou todos os pares em '+moves+' jogadas e '+fmt(secs)+'.'+extra;
+  setTimeout(()=>$('modal').classList.add('show'),500);
+}
+
+$('restart').onclick=start;$('again').onclick=start;$('level').onchange=start;
+start();
+</script>
+</body>
+</html>
